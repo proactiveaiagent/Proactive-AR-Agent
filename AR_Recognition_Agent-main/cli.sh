@@ -1,0 +1,12 @@
+python -m src.cli \
+    --video "./examples/video2.mp4" \
+    --max_pixels 262144 \
+    --audio "./examples/audio2.mp3" \
+    --model "/home/jyinap/shared_storage/jyinap/vllm/Qwen3-VL-8B-Instruct" \
+    --torch_dtype "bfloat16" \
+    --attn_implementation "sdpa" \
+    --user-id "test_user" \
+    --persist-dir "./chroma_db" \
+    --out "./outputs/scene.json" \
+    --embed-model "/home/jyinap/shared_storage/jyinap/emb/all-MiniLM-L6-v2" \
+    --asr-model "/home/jyinap/shared_storage/jyinap/stt/whisper-large-v3"

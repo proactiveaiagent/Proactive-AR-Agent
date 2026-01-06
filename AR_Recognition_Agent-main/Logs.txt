@@ -1,0 +1,14 @@
+开发日志
+1. 新建环境并安装cudatoolkits
+conda create -n aragent python=3.10
+conda activate aragent
+conda install conda-forge::ffmpeg
+conda install nvidia::cuda-toolkit==12.1.0(如果环境中cuda-toolkit已经安装，并且版本高于12.1.0，请将此步骤跳过)
+
+2. 在环境中安装torch
+pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --extra-index-url https://download.pytorch.org/whl/cu121
+
+3. 安装requirements.txt
+pip install -r requirements.txt
+
+注意改了model的torch dtype。
