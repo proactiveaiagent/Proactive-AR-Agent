@@ -12,11 +12,14 @@ class MultimodalInput:
     """Normalized multimodal input.
 
     - `images`: sequence of PIL images (e.g., sampled video frames)
+    - `faces`: dict mapping people_id to face embeddings for face-based retrieval
     - `audio_transcript`: ASR text if available
     - `metadata`: any additional extracted signals (timestamps, detected sound events, etc.)
     """
 
     images: Sequence[Image.Image] = ()
+    ann_img: Optional[Image.Image] = None
+    faces: Optional[dict[str, Any]] = None  # 可以存储 {people_id: face_embedding_vector}
     audio_transcript: Optional[str] = None
     metadata: Optional[dict[str, Any]] = None
 

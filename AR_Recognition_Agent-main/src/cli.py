@@ -12,7 +12,7 @@ from .memory.chroma_memory import ChromaUserMemory, MemoryConfig
 from .models.base import MultimodalInput
 from .models.qwen3vl import Qwen3VLConfig, Qwen3VLModel
 from .models.whisper import Whisper, WhisperConfig
-from .pipeline.preprocess import FrameSamplingConfig, sample_video_frames, transcribe_audio_stub
+from .pipeline.preprocess import FrameSamplingConfig, sample_video_frames, transcribe_audio_stub, face_detect
 
 
 def build_memory(persist_dir: str, embed_model: str) -> ChromaUserMemory:
@@ -20,9 +20,15 @@ def build_memory(persist_dir: str, embed_model: str) -> ChromaUserMemory:
     vs = Chroma(
         collection_name=MemoryConfig.collection_name,
         embedding_function=embeddings,
-        persist_directory=persist_dir,
+        persist_directory=persist_dir + "/object_memory",
     )
-    return ChromaUserMemory(vectorstore=vs, cfg=MemoryConfig(persist_directory=persist_dir))
+    pvs = Chroma(
+        collection_name=MemoryConfig.people_collection_name,
+        embedding_function=None,
+        persist_directory=persist_dir + "/people_memory",
+    )
+    
+    return ChromaUserMemory(vectorstore=vs, cfg=MemoryConfig(persist_directory=persist_dir), people_vectorstore=pvs)
 
 
 def main() -> None:
@@ -43,13 +49,14 @@ def main() -> None:
     Path("outputs").mkdir(parents=True, exist_ok=True)
 
     frames = sample_video_frames(args.video, FrameSamplingConfig())
+    frames, faces, ann_img = face_detect(frames)
     if args.audio:
         asr_model = Whisper(WhisperConfig(model_name_or_path=args.asr_model))
         transcript = transcribe_audio_stub(args.audio, asr_model)
     else:
         transcript = None
 
-    mm_input = MultimodalInput(images=frames, audio_transcript=transcript, metadata={"video": args.video})
+    mm_input = MultimodalInput(images=frames, faces=faces, audio_transcript=transcript, metadata={"video": args.video}, ann_img=ann_img)
 
     memory = build_memory(args.persist_dir, args.embed_model)
     model = Qwen3VLModel(

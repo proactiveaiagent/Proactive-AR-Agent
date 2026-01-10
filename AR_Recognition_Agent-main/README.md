@@ -13,6 +13,12 @@ A LangChain-based multimodal agent that ingests **video + audio** (and optionall
 AR_Recognition_Agent/
 ├── examples/
 │   ├── audio2.mp3
+│   ├── clip_audio1.mp3
+│   ├── clip_audio2.mp3
+│   ├── clip_audio3.mp3
+│   ├── clip1.mp4
+│   ├── clip2.mp4
+│   ├── clip3.mp4
 │   ├── video.mp4
 │   └── video2.mp4
 ├── src/
@@ -176,250 +182,322 @@ python -m src.cli \
 | -------- | ----- | ---------------------------------------------------------------------------------------- |
 | `--out`  | `str` | Path to the output file (JSON format) containing structured scene understanding results. |
 
+## Output Format Specification
 
-## Output Format
+This document defines the structured JSON output produced by the system for **scene understanding, object perception, people analysis, audio event recognition, and long-term memory matching**.
 
-## 1. High-Level Structure (Top-Level Schema)
+The format is strictly aligned with the system’s internal **Pydantic data models** and is designed to support:
 
-```text
-SceneUnderstandingOutput
-├─ scene_narrative
-├─ location_tag
-├─ what_is_happening
-├─ spatial_environmental_analysis
-├─ detected_people_analysis
-├─ interactive_objects_detail
-├─ detected_text_in_scene
-├─ user_status
-├─ user_interactions
-├─ is_user_speaking
-├─ sound_events_detected
-├─ extra
-└─ stored_objects
-```
-
-**Design characteristics**
-
-* Combines **current-frame perception** with **long-term object memory**
-* Clearly separates **observation**, **inference**, and **interaction**
-* Designed for **AR systems, multimodal agents, and memory-based reasoning**
+* Multimodal reasoning
+* AR / embodied AI agents
+* Memory persistence and identity matching
+* Downstream LLM or planning modules
 
 ---
 
-## 2. Scene-Level Semantics
+## Top-Level Structure
 
 ```json
-scene_narrative: string
-location_tag: string
-what_is_happening: string
-```
+{
+  "scene": { ... },
+  "objects": { ... },
+  "people": { ... },
+  "extra": { ... },
 
-**Purpose**
-
-* Natural-language summary of the scene
-* High-level contextual anchor for humans and LLMs
-* Suitable for narration, summarization, and embedding-based retrieval
-
----
-
-## 3. Spatial & Environmental Analysis
-
-```json
-spatial_environmental_analysis: {
-  user_reach_range: string
-  critical_interaction_zone: string
-  lighting_state: string
-  noise_level_category: string
-  safety_hazards: string
+  "stored_objects": [ ... ],
+  "matched_people": [ ... ]
 }
 ```
 
-**Purpose**
-
-* Describes physical accessibility and interaction feasibility
-* Supports AR safety checks and interaction planning
-* Abstracted understanding rather than raw sensor output
-
 ---
 
-## 4. People & Social Context Analysis
+## 1. `scene` — Global Scene Description
+
+Provides a **holistic understanding of the environment**, including context, activities, spatial constraints, and safety factors.
+
+### Schema
 
 ```json
-detected_people_analysis: {
-  relationship_situation_summary: string
-  people_list: [
-    {
-      role: string
-      location_relative_to_user: string
-      attention_target: string
-      activity_state: string
-    }
-  ]
+"scene": {
+  "thought": string,
+  "scene_narrative": string,
+  "location_tag": string,
+  "what_is_happening": string,
+  "spatial_environmental_analysis": { ... },
+  "detected_text_in_scene": [ ... ]
 }
 ```
 
-**Key points**
+### Field Descriptions
 
-* Supports multiple people
-* Encodes roles and relationships relative to the user
-* Enables attention modeling and social-context reasoning
-
----
-
-## 5. Interactive Objects (Current Scene)
-
-```json
-interactive_objects_detail: [
-  {
-    object_name: string
-    object_type: string
-    spatial_relation: string
-    current_state: string
-    affordance: string[]
-    digital_connectivity: string
-  }
-]
-```
-
-**Purpose**
-
-* Captures not only what objects exist, but:
-
-  * Where they are
-  * Their current state
-  * What actions they afford
-* Central to action planning and interaction reasoning
+| Field                    | Type   | Description                                                                                                      |
+| ------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------- |
+| `thought`                | string | Internal reasoning or abstract interpretation of the scene. Intended for agent cognition rather than UI display. |
+| `scene_narrative`        | string | Natural-language summary describing the scene as a whole.                                                        |
+| `location_tag`           | string | Semantic location label (e.g., `home_desk`, `office`, `outdoor_street`).                                         |
+| `what_is_happening`      | string | Concise description of the primary ongoing activity.                                                             |
+| `detected_text_in_scene` | array  | OCR-detected text elements in the environment.                                                                   |
 
 ---
 
-## 6. Text Detected in Scene (OCR & ASR Unified)
+### 1.1 `spatial_environmental_analysis`
+
+Describes **interaction constraints and environmental context** relevant to safety and planning.
 
 ```json
-detected_text_in_scene: [
-  {
-    text_content: string
-    text_source_description: string
-    text_role: string
-    associated_object_id: string | null
-    is_interactive: boolean
-    ocr_confidence: string
-  }
-]
-```
-
-**Purpose**
-
-* Unified abstraction for:
-
-  * Visual text (OCR)
-  * Spoken text (ASR)
-* Supports UI understanding, command detection, and dialogue triggers
-
----
-
-## 7. User State & Attention Modeling
-
-```json
-user_status: {
-  status_inference: string
-  observable_behaviors: string[]
-  gaze_target: string
-  gaze_duration: string
-  peripheral_awareness: string[]
+"spatial_environmental_analysis": {
+  "user_reach_range": string,
+  "critical_interaction_zone": string,
+  "lighting_state": string,
+  "noise_level_category": string,
+  "safety_hazards": string
 }
 ```
 
-**Purpose**
-
-* Infers user intent and mental state from observable behavior
-* Feeds proactive agent behavior and memory storage
+| Field                       | Description                            |
+| --------------------------- | -------------------------------------- |
+| `user_reach_range`          | Physical area reachable by the user    |
+| `critical_interaction_zone` | Area most relevant for interaction     |
+| `lighting_state`            | Lighting condition (e.g., bright, dim) |
+| `noise_level_category`      | Ambient noise level                    |
+| `safety_hazards`            | Potential risks in the environment     |
 
 ---
 
-## 8. Interaction Abstraction Layer
+### 1.2 `detected_text_in_scene`
+
+Represents text detected via OCR.
 
 ```json
-user_interactions: {
-  with_surroundings: string[]
-  with_ar_system: {
-    common_apps: string[]
-    typical_behaviors: string[]
-  }
-  with_agents: string[]
+{
+  "text_content": string,
+  "text_source_description": string,
+  "text_role": string,
+  "associated_object_id": string | null,
+  "is_interactive": boolean,
+  "ocr_confidence": string
 }
 ```
 
-**Purpose**
-
-* Describes how the user interacts with:
-
-  * The physical environment
-  * AR systems
-  * Other agents
-* Places the user within a broader interactive ecosystem
-
----
-
-## 9. Audio Events
-
-```json
-is_user_speaking: boolean
-
-sound_events_detected: [
-  {
-    event_type: string
-    source_location: string
-    sound_level_description: string
-    asr_transcript: string
-    asr_confidence: string
-  }
-]
-```
-
-**Purpose**
-
-* Treats sound as time-aligned events, not static attributes
-* Supports speech-aware and audio-aware agents
+| Field                     | Description                                   |
+| ------------------------- | --------------------------------------------- |
+| `text_content`            | Detected text content                         |
+| `text_source_description` | Where the text appears                        |
+| `text_role`               | Functional role (label, warning, instruction) |
+| `associated_object_id`    | Linked object if applicable                   |
+| `is_interactive`          | Whether the text implies interaction          |
+| `ocr_confidence`          | OCR confidence level                          |
 
 ---
 
-## 10. Long-Term Object Memory
+## 2. `objects` — Interactive Object Description
+
+Describes **objects relevant to user interaction**.
 
 ```json
-stored_objects: [
-  {
-    object_id: string
-    object_name: string
-    object_type: string
-    spatial_relation: string
-    current_state: string
-    affordance: string[]
-    digital_connectivity: string
-    first_seen: datetime
-    last_seen: datetime
-    seen_count: number
-  }
-]
+"objects": {
+  "interactive_objects_detail": [ ... ]
+}
 ```
-
-**Key characteristics**
-
-* Persistent object identity (`object_id`)
-* Temporal tracking (first seen, last seen, frequency)
-* Enables object permanence, memory retrieval, and long-term reasoning
 
 ---
 
-## 11. Extensibility Field
+### 2.1 `interactive_objects_detail`
 
 ```json
-extra: {}
+{
+  "thought": string,
+  "object_name": string,
+  "object_type": string,
+  "spatial_relation": string,
+  "current_state": string,
+  "affordance": [ string ],
+  "digital_connectivity": string
+}
 ```
 
-**Purpose**
+| Field                  | Description                                    |
+| ---------------------- | ---------------------------------------------- |
+| `thought`              | Internal reasoning explaining object relevance |
+| `object_name`          | Human-readable object name                     |
+| `object_type`          | Object category                                |
+| `spatial_relation`     | Position relative to the user                  |
+| `current_state`        | Observable state                               |
+| `affordance`           | Possible actions enabled by the object         |
+| `digital_connectivity` | Network or device connectivity status          |
 
-* Forward-compatible extension point
-* Allows adding new modalities or metadata without breaking the schema
+---
+
+## 3. `people` — People and Social Understanding
+
+Analyzes **people in the scene**, their roles, activities, and interaction with the user.
+
+```json
+"people": {
+  "detected_people_analysis": { ... },
+  "user_status": { ... },
+  "user_interactions": { ... },
+  "is_user_speaking": boolean | null,
+  "sound_events_detected": [ ... ]
+}
+```
+
+---
+
+### 3.1 `detected_people_analysis`
+
+```json
+{
+  "relationship_situation_summary": string,
+  "people_list": [ ... ]
+}
+```
+
+#### `people_list` Item
+
+```json
+{
+  "thought": string,
+  "people_id": string,
+  "role": string,
+  "location_relative_to_user": string,
+  "attention_target": string,
+  "activity_state": string,
+  "kinship_term": string
+}
+```
+
+| Field              | Description                                  |
+| ------------------ | -------------------------------------------- |
+| `people_id`        | Unique person identifier                     |
+| `role`             | Semantic role (User, Friend, Stranger, etc.) |
+| `attention_target` | Object or person being focused on            |
+| `activity_state`   | Current action                               |
+| `kinship_term`     | Social relationship descriptor               |
+
+---
+
+### 3.2 `user_status`
+
+Captures **inferred mental, physical, and attentional state** of the user.
+
+```json
+{
+  "status_inference": string,
+  "observable_behaviors": [ string ],
+  "gaze_target": string,
+  "gaze_duration": string,
+  "peripheral_awareness": [ string ]
+}
+```
+
+---
+
+### 3.3 `user_interactions`
+
+```json
+{
+  "with_surroundings": [ string ],
+  "with_ar_system": {
+    "common_apps": [ string ],
+    "typical_behaviors": [ string ]
+  },
+  "with_agents": [ string ]
+}
+```
+
+---
+
+### 3.4 `sound_events_detected`
+
+Describes **non-verbal and verbal audio events**.
+
+```json
+{
+  "event_type": string,
+  "source_location": string,
+  "sound_level_description": string,
+  "asr_transcript": string | null,
+  "asr_confidence": string | null
+}
+```
+
+---
+
+## 4. `stored_objects` — Long-Term Object Memory
+
+Persistent memory entries for objects tracked across time.
+
+```json
+{
+  "object_id": string,
+  "object_name": string,
+  "object_type": string,
+  "spatial_relation": string,
+  "current_state": string,
+  "affordance": [ string ],
+  "digital_connectivity": string,
+  "first_seen": string,
+  "last_seen": string,
+  "seen_count": number
+}
+```
+
+Used for:
+
+* Object re-identification
+* Temporal reasoning
+* Usage statistics
+
+---
+
+## 5. `matched_people` — Identity Matching Results
+
+Results of person identity matching against stored memory.
+
+```json
+{
+  "person_id": string,
+  "is_match": boolean,
+  "confidence": number,
+  "reasoning": string,
+  "stored_person": { ... } | null
+}
+```
+
+---
+
+### 5.1 `stored_person`
+
+```json
+{
+  "person_id": string,
+  "name": string | null,
+  "role": string,
+  "kinship_term": string,
+  "relationship_notes": string,
+  "first_seen": string,
+  "last_seen": string,
+  "seen_count": number,
+  "interaction_history": [ string ],
+  "typical_locations": [ string ]
+}
+```
+
+---
+
+## 6. `extra` — Extension Field
+
+```json
+"extra": { }
+```
+
+Reserved for:
+
+* Model-specific metadata
+* Experimental outputs
+* Future extensions
+
 
 
 ## Notes
