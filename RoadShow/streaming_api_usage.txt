@@ -1,0 +1,160 @@
+# ═══════════════════════════════════════════════════════════════
+# AR Streaming Server - Usage Guide
+# ═══════════════════════════════════════════════════════════════
+
+# ───────────────────────────────────────────────────────────────
+# 1. START SERVER
+# ───────────────────────────────────────────────────────────────
+python3 streaming_server.py
+
+
+# ───────────────────────────────────────────────────────────────
+# 2. HEALTH CHECK
+# ───────────────────────────────────────────────────────────────
+curl -X GET http://localhost:5000/health
+
+
+# ───────────────────────────────────────────────────────────────
+# 3. AR DEVICE SENDS VIDEO FRAMES
+# ───────────────────────────────────────────────────────────────
+curl -X POST http://localhost:5000/stream/video \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "user1", "frame_data": "<base64_jpeg>"}'
+
+# Example with timestamp:
+curl -X POST http://localhost:5000/stream/video \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "user1", "frame_data": "<base64_jpeg>", "timestamp": "2026-02-24T10:30:00"}'
+
+
+# ───────────────────────────────────────────────────────────────
+# 4. AR DEVICE SENDS AUDIO CHUNKS
+# ───────────────────────────────────────────────────────────────
+# While user is speaking:
+curl -X POST http://localhost:5000/stream/audio \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "user1", "audio_data": "<base64_pcm>", "is_speaking": true}'
+
+# When user stops speaking:
+curl -X POST http://localhost:5000/stream/audio \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "user1", "audio_data": "<base64_pcm>", "is_speaking": false}'
+
+
+# ───────────────────────────────────────────────────────────────
+# 5. AR DEVICE POLLS FOR SOLUTION
+# ───────────────────────────────────────────────────────────────
+# First poll (get any solution):
+curl -X POST http://localhost:5000/solution/get \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "user1", "last_checked": 0}'
+
+# Subsequent polls (only get new solutions):
+curl -X POST http://localhost:5000/solution/get \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "user1", "last_checked": 1708761000.123}'
+
+
+# ───────────────────────────────────────────────────────────────
+# 6. CHECK SESSION STATUS
+# ───────────────────────────────────────────────────────────────
+curl -X POST http://localhost:5000/session/status \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "user1"}'
+
+
+# ═══════════════════════════════════════════════════════════════
+# EXAMPLE WORKFLOW
+# ═══════════════════════════════════════════════════════════════
+
+# Step 1: AR device continuously sends frames (every 100ms)
+# → Server buffers until 10 frames collected
+
+# Step 2: User starts speaking
+# → AR device sends audio chunks with is_speaking=true
+
+# Step 3: User stops speaking
+# → AR device sends final chunk with is_speaking=false
+# → Server triggers processing pipeline
+
+# Step 4: Processing runs in background
+# → visual_agent.py processes 10 frames
+# → audio_agent.py transcribes audio
+# → reasoning_agent.py fuses results
+# → inference_agent.py generates AR solution
+
+# Step 5: AR device polls every 500ms
+# → Gets new solution when ready
+# → Displays on AR glasses
+
+
+# ═══════════════════════════════════════════════════════════════
+# RESPONSE EXAMPLES
+# ═══════════════════════════════════════════════════════════════
+
+# Health Check Response:
+{
+  "status": "running",
+  "active_sessions": 1,
+  "timestamp": "2026-02-24T10:30:00",
+  "agents_available": true,
+  "endpoints": {...}
+}
+
+# Solution Response (when new solution available):
+{
+  "status": "new_solution",
+  "has_solution": true,
+  "timestamp": 1708761000.123,
+  "processing": false,
+  "solution": {
+    "summary": "User visiting grandmother in rural setting",
+    "assistance_items": [
+      {
+        "category": "Social",
+        "need": "Greeting Grandma correctly",
+        "hud_message": "Display: 'Wish Grandma Happy New Year'",
+        "action_tip": "Say: 祝您身体健康，万事如意"
+      },
+      {
+        "category": "Environment",
+        "need": "Slippery ground detected",
+        "hud_message": "Alert: 'Careful! Icy steps near vegetable plot'",
+        "action_tip": "Help Grandma walk if going outside"
+      },
+      {
+        "category": "Memory/Task",
+        "need": "Relationship continuity",
+        "hud_message": "Recall: 'Grandma loves the tea you brought'",
+        "action_tip": "Ask: 'Did you try that Biluochun tea yet?'"
+      }
+    ],
+    "display": {
+      "main_message": "Display: 'Wish Grandma Happy New Year'",
+      "secondary_messages": [...],
+      "action_tips": [...]
+    }
+  }
+}
+
+# Solution Response (no new solution):
+{
+  "status": "no_new_solution",
+  "has_solution": false,
+  "last_solution_time": 1708761000.123,
+  "processing": false
+}
+
+
+# ═══════════════════════════════════════════════════════════════
+# NOTES
+# ═══════════════════════════════════════════════════════════════
+
+# • Replace <base64_jpeg> with actual base64-encoded JPEG image data
+# • Replace <base64_pcm> with actual base64-encoded PCM audio data
+# • Audio format: 16kHz, 16-bit, mono PCM
+# • Video frames trigger processing every 10 frames
+# • Audio triggers processing when is_speaking changes to false
+# • Poll interval recommended: 500ms
+# • Server runs on port 5000 by default
+# • All endpoints use POST except /health (GET)
