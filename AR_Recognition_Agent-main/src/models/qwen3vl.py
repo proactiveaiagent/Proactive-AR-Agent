@@ -16,7 +16,7 @@ class Qwen3VLConfig:
     model_name_or_path: str = "Qwen/Qwen2.5-VL-7B-Instruct"  # placeholder; set to your qwen3-vl
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
     torch_dtype: str = "auto"  # "auto" or a torch dtype name
-    max_new_tokens: int = 2048
+    max_new_tokens: int = 4096
     attn_implementation: str = "flash_attention_2"
     max_pixels: int = 50176
 
@@ -51,7 +51,10 @@ class Qwen3VLModel(MultimodalModel):
 
     def generate(self, *, system_prompt: str, user_prompt: str, mm_input: MultimodalInput) -> str:
         images: Sequence[Image.Image] = mm_input.images or ()
-
+        if mm_input.metadata is not None:
+            if 'use_ann_img' in mm_input.metadata:
+                if mm_input.metadata['use_ann_img'] and mm_input.ann_img is not None:
+                    images.append(mm_input.ann_img)
         # Minimal, generic multi-image prompt. Adjust to match your checkpoint's expected format.
         messages = [
             {"role": "system", "content": system_prompt},
@@ -61,7 +64,7 @@ class Qwen3VLModel(MultimodalModel):
                     *[{"type": "image", "image": img, "max_pixels": self.cfg.max_pixels} for img in images],
                     {"type": "text", "text": user_prompt},
                     *(
-                        [{"type": "text", "text": f"ASR: {mm_input.audio_transcript}"}]
+                        [{"type": "text", "text": f"Audio Transcript: {mm_input.audio_transcript}"}]
                         if mm_input.audio_transcript
                         else []
                     ),
@@ -75,7 +78,7 @@ class Qwen3VLModel(MultimodalModel):
         inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
 
         with torch.no_grad():
-            output_ids = self.model.generate(**inputs, max_new_tokens=self.cfg.max_new_tokens)
+            output_ids = self.model.generate(**inputs, max_new_tokens=self.cfg.max_new_tokens, do_sample=False)
 
         # Decode only newly generated tokens.
         generated_ids = output_ids[0][inputs["input_ids"].shape[-1] :]
