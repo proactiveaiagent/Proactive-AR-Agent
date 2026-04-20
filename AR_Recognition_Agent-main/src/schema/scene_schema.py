@@ -6,10 +6,13 @@ from pydantic import BaseModel, Field
 
 
 class PersonItem(BaseModel):
+    thought: str
+    people_id: str
     role: str
     location_relative_to_user: str
     attention_target: str
     activity_state: str
+    kinship_term: str
 
 
 class DetectedPeopleAnalysis(BaseModel):
@@ -18,6 +21,7 @@ class DetectedPeopleAnalysis(BaseModel):
 
 
 class InteractiveObject(BaseModel):
+    thought: str
     object_name: str
     object_type: str
     spatial_relation: str
@@ -71,21 +75,32 @@ class UserStatus(BaseModel):
 
 
 class SceneDescription(BaseModel):
+    thought: str
     scene_narrative: str
     location_tag: str
     what_is_happening: str
-
     spatial_environmental_analysis: SpatialEnvironmentalAnalysis
-    detected_people_analysis: DetectedPeopleAnalysis
-    interactive_objects_detail: List[InteractiveObject] = Field(default_factory=list)
     detected_text_in_scene: List[DetectedTextItem] = Field(default_factory=list)
-
+        
+        
+class ObjectDescription(BaseModel):
+    interactive_objects_detail: List[InteractiveObject] = Field(default_factory=list)
+    
+    
+class PersonDescription(BaseModel):
+    detected_people_analysis: DetectedPeopleAnalysis
     user_status: UserStatus
     user_interactions: UserInteractions
-
+    
     # Audio
     is_user_speaking: Optional[bool] = None
     sound_events_detected: List[SoundEvent] = Field(default_factory=list)
+        
+        
+class FinalDescription(BaseModel):
+    scene: SceneDescription
+    objects: ObjectDescription
+    people: PersonDescription
 
     # Allow extra model-specific fields if needed.
     extra: dict[str, Any] = Field(default_factory=dict)
@@ -110,3 +125,30 @@ class ObjectMatchResult(BaseModel):
     is_same: bool
     confidence: float
     reasoning: str
+
+class StoredPerson(BaseModel):
+    person_id: str
+    name: Optional[str] = None
+    role: str
+    kinship_term: str
+    relationship_notes: str = ""
+    first_seen: str
+    last_seen: str
+    seen_count: int
+    interaction_history: List[str] = Field(default_factory=list)
+    typical_locations: List[str] = Field(default_factory=list)
+    
+class PersonMatchResult(BaseModel):
+    person_id: str
+    is_match: bool
+    confidence: float
+    reasoning: str
+    stored_person: Optional[StoredPerson] = None
+    
+
+class Face:
+    def __init__(self, bounding_box, face_emb, cluster_id, extra_data):
+        self.bounding_box = bounding_box
+        self.face_emb = face_emb
+        self.cluster_id = cluster_id
+        self.extra_data = extra_data
